@@ -22,10 +22,11 @@ using namespace Qt::StringLiterals;
 
 using namespace Mustache;
 
-QString Mustache::renderTemplate(const QString &templateString, const QVariantHash &args)
+QString Mustache::renderTemplate(const QString &templateString, const QVariantHash &args,
+                                 Tag::EscapeMode defaultEscapeMode)
 {
     Mustache::QtVariantContext context(args);
-    Mustache::Renderer renderer;
+    Mustache::Renderer renderer(defaultEscapeMode);
     return renderer.render(templateString, &context);
 }
 
@@ -250,10 +251,11 @@ QString PartialFileLoader::getPartial(const QString &name)
     return m_cache.value(name);
 }
 
-Renderer::Renderer()
+Renderer::Renderer(Tag::EscapeMode defaultEscapeMode)
     : m_errorPos(-1)
     , m_defaultTagStartMarker(u"{{"_s)
     , m_defaultTagEndMarker(u"}}"_s)
+    , m_defaultEscapeMode(defaultEscapeMode)
 {
 }
 
@@ -431,6 +433,7 @@ Tag Renderer::findTag(const QString &content, int pos, int endPos)
     tag.type = Tag::Value;
     tag.start = tagStartPos;
     tag.end = tagEndPos;
+    tag.escapeMode = m_defaultEscapeMode;
 
     pos = tagStartPos + m_tagStartMarker.length();
     endPos = tagEndPos - m_tagEndMarker.length();
