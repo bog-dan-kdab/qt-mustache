@@ -41,6 +41,7 @@ private Q_SLOTS:
 	void testLambda();
 	void testQStringListIteration();
 	void testUnescapeHtml();
+	void testDefaultEscapeModeRaw();
 	void testConformance();
 	void testConformance_data();
 };

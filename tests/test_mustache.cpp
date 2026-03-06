@@ -463,6 +463,41 @@ void TestMustache::testQStringListIteration()
 	QCOMPARE(output, u"str1str2str3"_s);
 }
 
+void TestMustache::testDefaultEscapeModeRaw()
+{
+	QVariantHash map;
+	map[u"html"_s] = u"<b>bold</b>"_s;
+	map[u"entity"_s] = u"One &amp; Two"_s;
+
+	// With Raw default, {{key}} should pass through unescaped
+	Mustache::Renderer rawRenderer(Mustache::Tag::Raw);
+	Mustache::QtVariantContext context(map);
+
+	QString output = rawRenderer.render(u"{{html}}"_s, &context);
+	QCOMPARE(output, u"<b>bold</b>"_s);
+
+	// {{{key}}} is still raw
+	output = rawRenderer.render(u"{{{html}}}"_s, &context);
+	QCOMPARE(output, u"<b>bold</b>"_s);
+
+	// {{&key}} still unescapes HTML entities
+	output = rawRenderer.render(u"{{&entity}}"_s, &context);
+	QCOMPARE(output, u"One & Two"_s);
+
+	// Verify default Escape renderer still escapes
+	Mustache::Renderer defaultRenderer;
+	output = defaultRenderer.render(u"{{html}}"_s, &context);
+	QCOMPARE(output, u"&lt;b&gt;bold&lt;/b&gt;"_s);
+
+	// renderTemplate convenience function with Raw
+	output = Mustache::renderTemplate(u"{{html}}"_s, map, Mustache::Tag::Raw);
+	QCOMPARE(output, u"<b>bold</b>"_s);
+
+	// renderTemplate convenience function without explicit mode still escapes
+	output = Mustache::renderTemplate(u"{{html}}"_s, map);
+	QCOMPARE(output, u"&lt;b&gt;bold&lt;/b&gt;"_s);
+}
+
 void TestMustache::testUnescapeHtml()
 {
 	QVariantHash args;

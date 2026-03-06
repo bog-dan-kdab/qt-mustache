@@ -184,7 +184,7 @@ struct Tag
 class Renderer
 {
 public:
-    Renderer();
+    explicit Renderer(Tag::EscapeMode defaultEscapeMode = Tag::Escape);
 
     /** Render a Mustache template, using @p context to fetch
      * the values used to replace Mustache tags.
@@ -241,10 +241,12 @@ private:
 
     QString m_defaultTagStartMarker;
     QString m_defaultTagEndMarker;
+    Tag::EscapeMode m_defaultEscapeMode;
 };
 
 /** A convenience function which renders a template using the given data. */
-[[nodiscard]] QString renderTemplate(const QString &templateString, const QVariantHash &args);
+[[nodiscard]] QString renderTemplate(const QString &templateString, const QVariantHash &args,
+                                     Tag::EscapeMode defaultEscapeMode = Tag::Escape);
 [[nodiscard]] QString escapeHtml(const QString &input);
 [[nodiscard]] QString unescapeHtml(const QString &escaped);
 }
