@@ -39,7 +39,7 @@ public:
     /** Returns a string representation of the value for @p key in the current context.
      * This is used to replace a Mustache value tag.
      */
-    virtual QString stringValue(const QString &key) const = 0;
+    [[nodiscard]] virtual QString stringValue(const QString &key) const = 0;
 
     /** Returns true if the value for @p key is 'false' or an empty list.
      * 'False' values typically include empty strings, the boolean value false etc.
@@ -47,12 +47,12 @@ public:
      * is false, or for an inverted section tag, the section is only rendered if the key
      * is false.
      */
-    virtual bool isFalse(const QString &key) const = 0;
+    [[nodiscard]] virtual bool isFalse(const QString &key) const = 0;
 
     /** Returns the number of items in the list value for @p key or 0 if
      * the value for @p key is not a list.
      */
-    virtual int listCount(const QString &key) const = 0;
+    [[nodiscard]] virtual int listCount(const QString &key) const = 0;
 
     /** Set the current context to the value for @p key.
      * If index is >= 0, set the current context to the @p index'th value
@@ -64,10 +64,10 @@ public:
     virtual void pop() = 0;
 
     /** Returns the partial template for a given @p key. */
-    QString partialValue(const QString &key) const;
+    [[nodiscard]] QString partialValue(const QString &key) const;
 
     /** Returns the partial resolver passed to the constructor. */
-    PartialResolver *partialResolver() const;
+    [[nodiscard]] PartialResolver *partialResolver() const;
 
     /** Returns true if eval() should be used to render section tags using @p key.
      * If canEval() returns true for a key, the renderer will pass the literal, unrendered
@@ -76,7 +76,7 @@ public:
      * Mustache implementations.
      *      * The default implementation always returns false.
      */
-    virtual bool canEval(const QString &key) const;
+    [[nodiscard]] virtual bool canEval(const QString &key) const;
 
     /** Callback used to render a template section with the given @p key.
      * @p renderer will substitute the original section tag with the result of eval().
@@ -98,16 +98,16 @@ public:
     using fn_t = std::function<QString(const QString &, Mustache::Renderer *, Mustache::Context *)>;
     explicit QtVariantContext(const QVariant &root, PartialResolver *resolver = nullptr);
 
-    QString stringValue(const QString &key) const override;
-    bool isFalse(const QString &key) const override;
-    int listCount(const QString &key) const override;
+    [[nodiscard]] QString stringValue(const QString &key) const override;
+    [[nodiscard]] bool isFalse(const QString &key) const override;
+    [[nodiscard]] int listCount(const QString &key) const override;
     void push(const QString &key, int index = -1) override;
     void pop() override;
-    bool canEval(const QString &key) const override;
+    [[nodiscard]] bool canEval(const QString &key) const override;
     QString eval(const QString &key, const QString &_template, Mustache::Renderer *renderer) override;
 
 private:
-    QVariant value(const QString &key) const;
+    [[nodiscard]] QVariant value(const QString &key) const;
 
     QStack<QVariant> m_contextStack;
 };
@@ -119,7 +119,7 @@ public:
     virtual ~PartialResolver() = default;
 
     /** Returns the partial template with a given @p name. */
-    virtual QString getPartial(const QString &name) = 0;
+    [[nodiscard]] virtual QString getPartial(const QString &name) = 0;
 };
 
 /** A simple partial fetcher which returns templates from a map of (partial name -> template)
@@ -129,7 +129,7 @@ class PartialMap : public PartialResolver
 public:
     explicit PartialMap(const QHash<QString, QString> &partials);
 
-    QString getPartial(const QString &name) override;
+    [[nodiscard]] QString getPartial(const QString &name) override;
 
 private:
     QHash<QString, QString> m_partials;
@@ -145,7 +145,7 @@ class PartialFileLoader : public PartialResolver
 public:
     explicit PartialFileLoader(const QString &basePath);
 
-    QString getPartial(const QString &name) override;
+    [[nodiscard]] QString getPartial(const QString &name) override;
 
 private:
     QString m_basePath;
@@ -189,24 +189,24 @@ public:
     /** Render a Mustache template, using @p context to fetch
      * the values used to replace Mustache tags.
      */
-    QString render(const QString &_template, Context *context);
+    [[nodiscard]] QString render(const QString &_template, Context *context);
 
     /** Returns a message describing the last error encountered by the previous
      * render() call.
      */
-    QString error() const;
+    [[nodiscard]] QString error() const;
 
     /** Returns the position in the template where the last error occurred
      * when rendering the template or -1 if no error occurred.
      *      * If the error occurred in a partial template, the returned position is the offset
      * in the partial template.
      */
-    int errorPos() const;
+    [[nodiscard]] int errorPos() const;
 
     /** Returns the name of the partial where the error occurred, or an empty string
      * if the error occurred in the main template.
      */
-    QString errorPartial() const;
+    [[nodiscard]] QString errorPartial() const;
 
     /** Sets the default tag start and end markers.
      * This can be overridden within a template.
@@ -244,9 +244,9 @@ private:
 };
 
 /** A convenience function which renders a template using the given data. */
-QString renderTemplate(const QString &templateString, const QVariantHash &args);
-QString escapeHtml(const QString &input);
-QString unescapeHtml(const QString &escaped);
+[[nodiscard]] QString renderTemplate(const QString &templateString, const QVariantHash &args);
+[[nodiscard]] QString escapeHtml(const QString &input);
+[[nodiscard]] QString unescapeHtml(const QString &escaped);
 }
 
 Q_DECLARE_METATYPE(Mustache::QtVariantContext::fn_t)

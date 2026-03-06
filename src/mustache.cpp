@@ -17,7 +17,6 @@ are permitted provided that the following conditions are met:
 #include <QtCore/QDebug>
 #include <QtCore/QFile>
 #include <QtCore/QStringList>
-#include <QtCore/QTextStream>
 
 using namespace Qt::StringLiterals;
 
@@ -32,24 +31,38 @@ QString Mustache::renderTemplate(const QString &templateString, const QVariantHa
 
 QString Mustache::escapeHtml(const QString &input)
 {
-    QString escaped(input);
-    for (int i = 0; i < escaped.length();) {
-        std::u16string_view replacement;
-        ushort ch = escaped.at(i).unicode();
-        if (ch == u'&') {
-            replacement = u"&amp;";
-        } else if (ch == u'<') {
-            replacement = u"&lt;";
-        } else if (ch == u'>') {
-            replacement = u"&gt;";
-        } else if (ch == u'"') {
-            replacement = u"&quot;";
+    QString escaped;
+    escaped.reserve(input.size() + input.size() / 8);
+    int pos = 0;
+    const int len = input.size();
+    while (pos < len) {
+        const int start = pos;
+        while (pos < len) {
+            const char16_t ch = input.at(pos).unicode();
+            if (ch == u'&' || ch == u'<' || ch == u'>' || ch == u'"') {
+                break;
+            }
+            ++pos;
         }
-        if (!replacement.empty()) {
-            escaped.replace(i, 1, QString::fromUtf16(replacement.data(), replacement.size()));
-            i += replacement.size();
-        } else {
-            ++i;
+        if (pos > start) {
+            escaped += QStringView(input).mid(start, pos - start);
+        }
+        if (pos < len) {
+            switch (input.at(pos).unicode()) {
+            case u'&':
+                escaped += u"&amp;"_s;
+                break;
+            case u'<':
+                escaped += u"&lt;"_s;
+                break;
+            case u'>':
+                escaped += u"&gt;"_s;
+                break;
+            case u'"':
+                escaped += u"&quot;"_s;
+                break;
+            }
+            ++pos;
         }
     }
     return escaped;
@@ -58,10 +71,10 @@ QString Mustache::escapeHtml(const QString &input)
 QString Mustache::unescapeHtml(const QString &escaped)
 {
     QString unescaped(escaped);
-    unescaped.replace(QLatin1String("&lt;"), QLatin1String("<"));
-    unescaped.replace(QLatin1String("&gt;"), QLatin1String(">"));
-    unescaped.replace(QLatin1String("&quot;"), QLatin1String("\""));
-    unescaped.replace(QLatin1String("&amp;"), QLatin1String("&"));
+    unescaped.replace(u"&lt;"_s, u"<"_s);
+    unescaped.replace(u"&gt;"_s, u">"_s);
+    unescaped.replace(u"&quot;"_s, u"\""_s);
+    unescaped.replace(u"&amp;"_s, u"&"_s);
     return unescaped;
 }
 
@@ -228,11 +241,10 @@ PartialFileLoader::PartialFileLoader(const QString &basePath)
 QString PartialFileLoader::getPartial(const QString &name)
 {
     if (!m_cache.contains(name)) {
-        QString path = m_basePath + u'/' + name + u".mustache"_s;
+        const QString path = m_basePath + u'/' + name + u".mustache"_s;
         QFile file(path);
         if (file.open(QIODevice::ReadOnly)) {
-            QTextStream stream(&file);
-            m_cache.insert(name, stream.readAll());
+            m_cache.insert(name, QString::fromUtf8(file.readAll()));
         }
     }
     return m_cache.value(name);
@@ -275,15 +287,17 @@ QString Renderer::render(const QString &_template, Context *context)
 QString Renderer::render(const QString &_template, int startPos, int endPos, Context *context)
 {
     QString output;
+    output.reserve(endPos - startPos);
+    const QStringView templateView(_template);
     int lastTagEnd = startPos;
 
     while (m_errorPos == -1) {
         Tag tag = findTag(_template, lastTagEnd, endPos);
         if (tag.type == Tag::Null) {
-            output += QStringView(_template).mid(lastTagEnd, endPos - lastTagEnd);
+            output += templateView.mid(lastTagEnd, endPos - lastTagEnd);
             break;
         }
-        output += QStringView(_template).mid(lastTagEnd, tag.start - lastTagEnd);
+        output += templateView.mid(lastTagEnd, tag.start - lastTagEnd);
         switch (tag.type) {
         case Tag::Value: {
             QString value = context->stringValue(tag.key);
@@ -423,31 +437,31 @@ Tag Renderer::findTag(const QString &content, int pos, int endPos)
 
     QChar typeChar = content.at(pos);
 
-    if (typeChar == '#') {
+    if (typeChar == u'#') {
         tag.type = Tag::SectionStart;
         tag.key = readTagName(content, pos + 1, endPos);
-    } else if (typeChar == '^') {
+    } else if (typeChar == u'^') {
         tag.type = Tag::InvertedSectionStart;
         tag.key = readTagName(content, pos + 1, endPos);
-    } else if (typeChar == '/') {
+    } else if (typeChar == u'/') {
         tag.type = Tag::SectionEnd;
         tag.key = readTagName(content, pos + 1, endPos);
-    } else if (typeChar == '!') {
+    } else if (typeChar == u'!') {
         tag.type = Tag::Comment;
-    } else if (typeChar == '>') {
+    } else if (typeChar == u'>') {
         tag.type = Tag::Partial;
         tag.key = readTagName(content, pos + 1, endPos);
-    } else if (typeChar == '=') {
+    } else if (typeChar == u'=') {
         tag.type = Tag::SetDelimiter;
         readSetDelimiter(content, pos + 1, tagEndPos - m_tagEndMarker.length());
     } else {
-        if (typeChar == '&') {
+        if (typeChar == u'&') {
             tag.escapeMode = Tag::Unescape;
             ++pos;
-        } else if (typeChar == '{') {
+        } else if (typeChar == u'{') {
             tag.escapeMode = Tag::Raw;
             ++pos;
-            int endTache = content.indexOf('}', pos);
+            int endTache = content.indexOf(u'}', pos);
             if (endTache == tag.end - m_tagEndMarker.length()) {
                 ++tag.end;
             } else {
@@ -467,48 +481,45 @@ Tag Renderer::findTag(const QString &content, int pos, int endPos)
 
 QString Renderer::readTagName(const QString &content, int pos, int endPos)
 {
-    QString name;
-    name.reserve(endPos - pos);
-    while (content.at(pos).isSpace()) {
+    while (pos < endPos && content.at(pos).isSpace()) {
         ++pos;
     }
-    while (!content.at(pos).isSpace() && pos < endPos) {
-        name += content.at(pos);
+    const int start = pos;
+    while (pos < endPos && !content.at(pos).isSpace()) {
         ++pos;
     }
-    return name;
+    return content.mid(start, pos - start);
 }
 
 void Renderer::readSetDelimiter(const QString &content, int pos, int endPos)
 {
-    QString startMarker;
-    QString endMarker;
-
-    while (content.at(pos).isSpace() && pos < endPos) {
+    while (pos < endPos && content.at(pos).isSpace()) {
         ++pos;
     }
 
-    while (!content.at(pos).isSpace() && pos < endPos) {
-        if (content.at(pos) == '=') {
+    int start = pos;
+    while (pos < endPos && !content.at(pos).isSpace()) {
+        if (content.at(pos) == u'=') {
             setError(u"Custom delimiters may not contain '='."_s, pos);
             return;
         }
-        startMarker += content.at(pos);
+        ++pos;
+    }
+    const QString startMarker = content.mid(start, pos - start);
+
+    while (pos < endPos && content.at(pos).isSpace()) {
         ++pos;
     }
 
-    while (content.at(pos).isSpace() && pos < endPos) {
-        ++pos;
-    }
-
-    while (!content.at(pos).isSpace() && pos < endPos - 1) {
-        if (content.at(pos) == '=') {
+    start = pos;
+    while (pos < endPos - 1 && !content.at(pos).isSpace()) {
+        if (content.at(pos) == u'=') {
             setError(u"Custom delimiters may not contain '='."_s, pos);
             return;
         }
-        endMarker += content.at(pos);
         ++pos;
     }
+    const QString endMarker = content.mid(start, pos - start);
 
     m_tagStartMarker = startMarker;
     m_tagEndMarker = endMarker;
@@ -554,7 +565,7 @@ void Renderer::expandTag(Tag &tag, const QString &content)
     int indentation = 0;
 
     // Move start to beginning of line.
-    while (start > 0 && content.at(start - 1) != QLatin1Char('\n')) {
+    while (start > 0 && content.at(start - 1) != u'\n') {
         --start;
         if (!content.at(start).isSpace()) {
             return; // Not standalone.
@@ -565,7 +576,7 @@ void Renderer::expandTag(Tag &tag, const QString &content)
     }
 
     // Move end to one past end of line.
-    while (end <= content.size() && content.at(end - 1) != QLatin1Char('\n')) {
+    while (end <= content.size() && content.at(end - 1) != u'\n') {
         if (end < content.size() && !content.at(end).isSpace()) {
             return; // Not standalone.
         }
