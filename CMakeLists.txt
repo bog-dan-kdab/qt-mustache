@@ -8,14 +8,19 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
+include(GNUInstallDirs)
+
 set(QT_MUSTACHE_SOURCES
     src/mustache.h
     src/mustache.cpp
 )
 
 add_library(${PROJECT_NAME} ${QT_MUSTACHE_SOURCES})
+add_library(mustache::mustache ALIAS ${PROJECT_NAME})
+
 target_include_directories(${PROJECT_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Core)
 
@@ -33,12 +38,24 @@ set(STRICT_COMPILE_DEFINITIONS
 target_compile_definitions(${PROJECT_NAME} PRIVATE ${STRICT_COMPILE_DEFINITIONS})
 set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 
-# Tests
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    include(CTest)
-endif()
+# Install rules
+install(TARGETS ${PROJECT_NAME}
+    EXPORT mustache-targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+install(FILES src/mustache.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(EXPORT mustache-targets
+    NAMESPACE mustache::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mustache
+)
 
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
+# Tests — off by default when consumed as a dependency
+string(COMPARE EQUAL "${CMAKE_SOURCE_DIR}" "${PROJECT_SOURCE_DIR}" _mustache_is_top_level)
+option(MUSTACHE_BUILD_TESTS "Build qt-mustache tests and benchmarks" ${_mustache_is_top_level})
+
+if(MUSTACHE_BUILD_TESTS)
     set(TEST_PROJECT_NAME "${PROJECT_NAME}_tests")
     enable_testing()
 
@@ -49,7 +66,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
         tests/test_mustache.h
     )
     add_test(${TEST_PROJECT_NAME} ${TEST_PROJECT_NAME})
-    target_link_libraries(${TEST_PROJECT_NAME} PRIVATE Qt6::Test ${PROJECT_NAME})
+    target_link_libraries(${TEST_PROJECT_NAME} PRIVATE Qt6::Test mustache::mustache)
     target_compile_definitions(${TEST_PROJECT_NAME} PRIVATE ${STRICT_COMPILE_DEFINITIONS})
     set_target_properties(${TEST_PROJECT_NAME} PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 
@@ -64,7 +81,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
     add_executable(${BENCH_PROJECT_NAME}
         tests/bench_mustache.cpp
     )
-    target_link_libraries(${BENCH_PROJECT_NAME} PRIVATE Qt6::Test ${PROJECT_NAME})
+    target_link_libraries(${BENCH_PROJECT_NAME} PRIVATE Qt6::Test mustache::mustache)
     target_compile_definitions(${BENCH_PROJECT_NAME} PRIVATE ${STRICT_COMPILE_DEFINITIONS})
     set_target_properties(${BENCH_PROJECT_NAME} PROPERTIES COMPILE_WARNING_AS_ERROR ON)
 endif()
